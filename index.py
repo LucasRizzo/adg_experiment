@@ -4,6 +4,19 @@ import time
 import math 
 
 CSV_FILE = './bank_sm.csv'
+df = pd.read_csv(CSV_FILE,sep=';')
+T = []
+Y = []
+
+for index, row in df.iterrows():
+    T.append(set())
+    for i in df.columns:
+        if i != 'y':
+            T[-1].add((i, row[i]))
+        else:
+            Y.append(row[i])
+
+print(T)
 
 class ArgumentationDecisionGraph:
     '''
@@ -17,6 +30,18 @@ class ArgumentationDecisionGraph:
         self.arguments = ar
         #r is edges
         self.relations = r
+    
+    def __str__(self) -> str:
+
+        result = "Arguments\n"
+        for arg in self.arguments:
+            result += str(arg) + "\n"
+        
+        result += "\nRelations\n"
+        for r in self.relations:
+            result += str(r) + "\n"
+
+        return result
 
 '''
 verified function, 
@@ -176,38 +201,46 @@ def read_data_to_pairs(file):
         # cnt = 0
         for j in df[i].unique():
             feature_value_pairs.add((i,j))
-            # print(i,j)
+            #print(i,j)
             # cnt += 1
             # if cnt > 5:
             #     break
     return feature_value_pairs
 
-def evaluate(adg, dataset=CSV_FILE):
+def evaluate(adg, t=T, y=Y):
     correct = 0
-    df = pd.read_csv(dataset,sep=';')
-    for index, row in df.iterrows():
-        t = set()
-        for i in df.columns:
-            if i != 'y':
-                t.add((i, row[i]))
-        if ((predict(adg, t) == 1) and (row['y'] == 'yes')) or ((predict(adg, t) == 0) and (row['y'] == 'no')):
-            correct += 1
+
+    #print(t)
+
+    for i in range(len(t)):
+        if y[i] == 'yes':
+            if (predict(adg, t[i]) == 1):
+                correct += 1
+        elif y[i] == 'no':
+            if (predict(adg, t[i]) == 0):
+                correct += 1
     return correct / df.shape[0]
 
 def add_argument(adg, a):
     print('trying to add_argument:', a)
     for b in adg.arguments:
+        
         adg_in = copy.deepcopy(adg)
         adg_out = copy.deepcopy(adg)
         adg_bi = copy.deepcopy(adg)
+        
         adg_in.arguments.add(a)
         adg_in.relations.add((a, b))
+        
         adg_out.arguments.add(a)
         adg_out.relations.add((b, a))
+        
         adg_bi.arguments.add(a)
         adg_bi.relations.add((a,b))
         adg_bi.relations.add((b,a))
+        
         print("eval relations between:", a, b)
+        
         if (a[0][0] != b[0][0]) and (a[1] != b[1]) and (a[1] != 'und') and (b[1] != 'und'):
             # evaluate adg_in, adg_out, and adg_bi, return the best one of these 3
             if evaluate(adg_in) > evaluate(adg_out):
@@ -244,7 +277,7 @@ def train(threshold, dataset=CSV_FILE):
         arg.add((fvp, 'und'))
     adg_old = ArgumentationDecisionGraph(set(), set())
     adg_old.arguments.add((('age', 30), 0))
-    while len(arg) > 0 :
+    while len(arg) > 0:
         adg_best = copy.deepcopy(adg_old)
         del_list = set()
         print(math.factorial(len(fvps)*3 - len(arg))/math.factorial(len(fvps)*3)*100, "% done")
@@ -254,7 +287,7 @@ def train(threshold, dataset=CSV_FILE):
 
             adg_old = copy.deepcopy(adg_best)
             adg_new = add_argument(adg_best, a)
-            perf_new = evaluate(adg_new, dataset)
+            perf_new = evaluate(adg_new)
             if perf_new > perf + threshold:
                 perf = perf_new
                 adg_best = adg_new
